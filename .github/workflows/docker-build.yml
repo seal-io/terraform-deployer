@@ -1,7 +1,7 @@
 name: Build Terraform Deployment Image
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   push:
     branches:
       - main
@@ -9,10 +9,8 @@ on:
       - "v*"
 
 env:
-  CI_DOCKERHUB_USERNAME: ${{ secrets.CI_DOCKERHUB_USERNAME }}
-  CI_DOCKERHUB_PASSWORD: ${{ secrets.CI_DOCKERHUB_PASSWORD }}
   TERRAFORM_VERSION: 1.3.9
-  IMAGE_NAME: "terraform-deployer"
+  REPO: "sealio"
   BUILD_PLATFORMS: "linux/amd64,linux/arm64"
 
 jobs:
@@ -23,8 +21,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up QEMU
+      - name: Setup QEMU
         uses: docker/setup-qemu-action@v2
+        with:
+          image: tonistiigi/binfmt:qemu-v7.0.0
+          platforms: "arm64"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -32,25 +33,25 @@ jobs:
 
       - name: Get Docker Metadata
         if: ${{ github.event_name != 'pull_request' }}
-        id: terraform
+        id: metadata
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.CI_DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REPO }}/terraform-deployer
 
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
-          username: ${{ env.CI_DOCKERHUB_USERNAME }}
-          password: ${{ env.CI_DOCKERHUB_PASSWORD }}
+          username: ${{ secrets.CI_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.CI_DOCKERHUB_PASSWORD }}
 
       - name: Build and push image
         uses: docker/build-push-action@v4
         with:
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           context: .
-          tags: ${{ steps.terraform.outputs.tags }}
+          tags: ${{ steps.metadata.outputs.tags }}
           platforms: ${{ env.BUILD_PLATFORMS }}
-          cache-from: type=registry,ref=${{ env.CI_DOCKERHUB_USERNAME }}/build-cache:${{ env.IMAGE_NAME }}
-          cache-to: type=registry,mode=max,compression=zstd,compression-level=20,ref=${{ env.CI_DOCKERHUB_USERNAME }}/build-cache:${{ env.IMAGE_NAME }}
+          cache-from: type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer
+          cache-to: type=registry,mode=max,compression=zstd,compression-level=20,ref=${{ env.REPO }}/build-cache:terraform-deployer
           build-args: |
-            --build-arg TERRAFORM_VERSION=${{ env.TERRAFORM_VERSION }}
+            TERRAFORM_VERSION=${{ env.TERRAFORM_VERSION }}
