@@ -1,46 +1,56 @@
 name: Build Terraform Deployment Image
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 env:
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  CI_DOCKER_USERNAME: ${{ secrets.CI_DOCKER_USERNAME }}
+  CI_DOCKER_PASSWORD: ${{ secrets.CI_DOCKER_PASSWORD }}
+  TERRAFORM_VERSION: 1.3.9
+  IMAGE_NAME: "terraform-deployment"
+  BUILD_PLATFORMS: "linux/amd64,linux/arm64"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        arch: [amd64, arm64]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
+        id: buildx
+
+      - name: Get Docker Metadata
+        if: ${{ github.event_name != 'pull_request' }}
+        id: terraform
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.CI_DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          username: ${{ env.CI_DOCKER_USERNAME }}
+          password: ${{ env.CI_DOCKER_PASSWORD }}
 
       - name: Build and push image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
-          context: .
           push: true
-          tags: ${{ env.DOCKER_USERNAME }}/terraform-deployment:${{ github.sha }}, ${{ env.DOCKER_USERNAME }}/terraform-deployment:${{ matrix.arch }}
-          platform: linux/${{ matrix.arch }}
-          builder: docker
+          context: .
+          tags: ${{ steps.terraform.outputs.tags }}
+          platforms: ${{ env.BUILD_PLATFORMS }}
+          cache-from: type=registry,ref=${{ env.CI_DOCKER_USERNAME }}/build-cache:${{ env.IMAGE_NAME }}
+          cache-to: type=registry,mode=max,compression=zstd,compression-level=20,ref=${{ env.CI_DOCKER_USERNAME }}/build-cache:${{ env.IMAGE_NAME }}
           build-args: |
-            --build-arg TERRAFORM_VERSION=1.3.9
-            --build-arg TARGETARCH=${{ matrix.arch }}
+            --build-arg TERRAFORM_VERSION=${{ env.TERRAFORM_VERSION }}
