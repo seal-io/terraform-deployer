@@ -9,13 +9,12 @@ on:
       - "v*"
 
 env:
-  TERRAFORM_VERSION: 1.3.9
   REPO: "sealio"
   BUILD_PLATFORMS: "linux/amd64,linux/arm64"
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -29,7 +28,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        id: buildx
 
       - name: Get Docker Metadata
         if: ${{ github.event_name != 'pull_request' }}
@@ -51,7 +49,7 @@ jobs:
           context: .
           tags: ${{ steps.metadata.outputs.tags }}
           platforms: ${{ env.BUILD_PLATFORMS }}
-          cache-from: type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer
-          cache-to: type=registry,mode=max,compression=zstd,compression-level=20,ref=${{ env.REPO }}/build-cache:terraform-deployer
-          build-args: |
-            TERRAFORM_VERSION=${{ env.TERRAFORM_VERSION }}
+          cache-from: |
+            type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer
+          cache-to: |
+            ${{ github.event_name != 'pull_request' && format('type=registry,mode=max,oci-mediatypes=false,compression=gzip,ref={0}/build-cache:terraform-deployer,ignore-error=true', env.REPO) || '' }}
