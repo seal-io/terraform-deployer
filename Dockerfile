@@ -1,21 +1,40 @@
-# build an image with terraform
-FROM --platform=$BUILDPLATFORM alpine:3.17
+FROM --platform=$TARGETPLATFORM alpine:3.17.3
 
-ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETOS
 ARG TARGETARCH
-ARG TERRAFORM_VERSION
-ENV TERRAFORM_VERSION ${TERRAFORM_VERSION:-1.3.9}
 
-WORKDIR /root
+RUN set -eo pipefail; \
+    apk add -U --no-cache \
+      ca-certificates \
+      curl unzip git bash openssh \
+    ; \
+    rm -rf /var/cache/apk/*;
 
-# install terraform
-RUN apk add --no-cache curl unzip git \
-    && curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip -o terraform.zip \
-    && unzip terraform.zip \
-    && chmod +x terraform \
-    && mv terraform /usr/local/bin/ \
-    && curl -sL https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/${TARGETARCH}/kubectl -o kubectl \
-    && chmod +x kubectl \
-    && mv kubectl /usr/local/bin/
+# set locale
+RUN set -eo pipefail; \
+    apk add -U --no-cache \
+      tzdata \
+    ; \
+    rm -rf /var/cache/apk/*;
+ENV LANG='en_US.UTF-8' \
+    LANGUAGE='en_US:en' \
+    LC_ALL='en_US.UTF-8'
+
+
+# get kubectl
+RUN KUBECTL_VER="v1.25.5"; \
+    curl -sfL https://dl.k8s.io/${KUBECTL_VER}/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | \
+        tar -xvzf - --strip-components=3 --no-same-owner -C /usr/bin/ kubernetes/client/bin/kubectl && \
+    ln -s /usr/bin/kubectl /usr/bin/k
+
+# get terraform
+RUN TF_VER="1.4.5"; \
+    curl -sfL https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_linux_${TARGETARCH}.zip -o /tmp/terraform.zip && \
+    unzip /tmp/terraform.zip -d /usr/bin/ && \
+    ln -s /usr/bin/terraform /usr/bin/tf; \
+    \
+    rm -f /tmp/terraform.zip
+ENV TF_LOG=INFO
 
 CMD [ "terraform" ]
