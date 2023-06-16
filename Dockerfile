@@ -37,4 +37,13 @@ RUN TF_VER="1.4.5"; \
     rm -f /tmp/terraform.zip
 ENV TF_LOG=INFO
 
+# run as non-root
+RUN adduser -D -h /var/terraform -u 1000 terraform
+USER terraform
+WORKDIR /var/terraform/workspace
+
+# prepare provider plugin mirror for built-in templates
+COPY mirror-plugins.sh .
+RUN ./mirror-plugins.sh
+
 CMD [ "terraform" ]
