@@ -42,6 +42,10 @@ RUN adduser -D -h /var/terraform -u 1000 terraform
 USER terraform
 WORKDIR /var/terraform/workspace
 
+# Prepare .terraformrc
+COPY terraformrc /var/terraform/.terraformrc
+RUN mkdir -p /var/terraform/.terraform.d/plugins
+
 # prepare provider plugin mirror for built-in templates
 COPY mirror-plugins.sh .
 RUN ./mirror-plugins.sh
