@@ -7,7 +7,7 @@ ARG TARGETARCH
 RUN set -eo pipefail; \
     apk add -U --no-cache \
       ca-certificates \
-      curl unzip git bash openssh \
+      curl unzip git bash openssh jq \
     ; \
     rm -rf /var/cache/apk/*;
 
