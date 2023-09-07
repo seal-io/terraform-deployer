@@ -25,7 +25,6 @@ for template in templates/*; do
 	if [ -d "$template" ]; then
     # Prepare implied local mirror.
     # See https://developer.hashicorp.com/terraform/cli/config/config-file#implied-local-mirror-directories.
-		terraform -chdir="${template}" init && \
-		terraform -chdir="${template}" providers mirror "$HOME/.terraform.d/plugins"
+		terraform -chdir="${template}" init
 	fi
 done
