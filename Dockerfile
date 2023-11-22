@@ -7,7 +7,7 @@ ARG TARGETARCH
 RUN set -eo pipefail; \
     apk add -U --no-cache \
       ca-certificates \
-      curl unzip git bash openssh \
+      curl unzip git bash openssh jq \
     ; \
     rm -rf /var/cache/apk/*;
 
@@ -42,12 +42,13 @@ RUN adduser -D -h /var/terraform -u 1000 terraform
 USER terraform
 WORKDIR /var/terraform/workspace
 
-# Prepare .terraformrc
-COPY terraformrc /var/terraform/.terraformrc
 RUN mkdir -p /var/terraform/.terraform.d/plugins
 
 # prepare provider plugin mirror for built-in templates
 COPY mirror-plugins.sh .
 RUN ./mirror-plugins.sh
+
+# Prepare .terraformrc
+COPY terraformrc /var/terraform/.terraformrc
 
 CMD [ "terraform" ]
