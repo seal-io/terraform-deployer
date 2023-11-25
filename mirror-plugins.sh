@@ -1,16 +1,15 @@
 #!/bin/bash
-
-ORG_NAME="walrus-catalog"
-# GitHub API URL
-API_URL="https://api.github.com/orgs/${ORG_NAME}/repos"
-
+API_URL_PREFIX="https://api.github.com/orgs/"
 # mkdir templates.
 mkdir -p templates
+org_names=("walrus-catalog" "walrus-catalog-sandbox")
 
 prepare () {
-	repos=$(curl -s "$API_URL")
+	org_name=$1
+	api_url="${API_URL_PREFIX}${org_name}/repos"
+	repos=$(curl -s "$api_url")
 	for repo in $(echo "$repos" | jq -r '.[].name'); do
-		git clone https://github.com/${ORG_NAME}/${repo} templates/${repo}
+		git clone https://github.com/${org_name}/${repo} templates/${repo}
 	done
 }
 
@@ -18,7 +17,10 @@ cleanup () {
   rm -rf mirror-plugins.sh templates
 }
 
-prepare
+for org_name in "${org_names[@]}"; do
+	prepare "$org_name"
+done
+
 trap cleanup INT TERM EXIT
 
 for template in templates/*; do
