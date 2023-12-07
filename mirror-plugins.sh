@@ -19,3 +19,5 @@ for module_dir in */*/; do
     terraform -chdir="$module_dir" providers mirror "$HOME/.terraform.d/plugins"
 done
 
+# Remove non-provider plugin files to avoid Terraform warnings.
+find /var/terraform/.terraform.d/plugins -type f ! -name "terraform-provider-*" -delete
