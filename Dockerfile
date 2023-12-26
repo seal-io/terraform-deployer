@@ -1,4 +1,7 @@
-FROM --platform=$TARGETPLATFORM alpine:3.17.3
+#
+# Fetch
+#
+FROM --platform=$TARGETPLATFORM hashicorp/terraform:1.5.7 AS fetch
 
 ARG TARGETPLATFORM
 ARG TARGETOS
@@ -7,47 +10,82 @@ ARG TARGETARCH
 RUN set -eo pipefail; \
     apk add -U --no-cache \
       ca-certificates \
-      curl unzip git bash openssh \
+      curl openssh \
+      unzip \
+      git \
+      jq \
     ; \
-    rm -rf /var/cache/apk/*;
+    rm -rf /var/cache/apk/*
+
+ENV TF_LOG="ERROR"
+WORKDIR /workspace
+
+# download templates
+RUN set -eo pipefail; \
+    echo "walrus-catalog walrus-catalog-sandbox" | tr -s '[:blank:]' '\n' | \
+    while read -r org _; do \
+      curl -sSL "https://api.github.com/orgs/$org/repos" | jq -r '.[].name' | \
+      while read -r repo _; do \
+        git clone "https://github.com/$org/$repo" "$org"_"$repo" --depth 1; \
+      done; \
+    done
+
+# mirror plugins
+## cache plugins to reduce network latency
+ENV TF_PLUGIN_CACHE_DIR="/workspace/.terraform.d/plugin-cache" \
+    TF_PLUGIN_MIRROR_DIR="/workspace/.terraform.d/plugins"
+RUN set -eo pipefail; \
+    mkdir -p $TF_PLUGIN_CACHE_DIR; \
+    mkdir -p $TF_PLUGIN_MIRROR_DIR; \
+    echo -e "provider_installation {\n \
+      filesystem_mirror {\n \
+        path = \"$TF_PLUGIN_MIRROR_DIR\"\n \
+      }\n \
+      direct {} \n \
+    }\n" > /root/.terraformrc && \
+    find . -maxdepth 1 -type d -name 'walrus-catalog*' -exec sh -c 'terraform -chdir="$1" init && terraform -chdir="$1" providers mirror $TF_PLUGIN_MIRROR_DIR' _ {} \;
+## remove non-plugin files to prevent annoying message
+RUN set -eo pipefail; \
+    find $TF_PLUGIN_MIRROR_DIR -type f ! -name "terraform-provider-*" -delete
+
+#
+# Release
+#
+FROM --platform=$TARGETPLATFORM hashicorp/terraform:1.5.7
+LABEL maintainer="Seal Engineer Team <engineering@seal.io>"
+
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN set -eo pipefail; \
+    apk add -U --no-cache \
+      ca-certificates \
+      openssl \
+      curl unzip \
+    ; \
+    rm -rf /var/cache/apk/*
 
 # set locale
 RUN set -eo pipefail; \
     apk add -U --no-cache \
       tzdata \
     ; \
-    rm -rf /var/cache/apk/*;
+    rm -rf /var/cache/apk/*
 ENV LANG='en_US.UTF-8' \
     LANGUAGE='en_US:en' \
     LC_ALL='en_US.UTF-8'
 
-
-# get kubectl
+# get kubectl for gavinbunney/kubectl provider
 RUN KUBECTL_VER="v1.25.5"; \
     curl -sfL https://dl.k8s.io/${KUBECTL_VER}/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | \
-        tar -xvzf - --strip-components=3 --no-same-owner -C /usr/bin/ kubernetes/client/bin/kubectl && \
-    ln -s /usr/bin/kubectl /usr/bin/k
+        tar -xvzf - --strip-components=3 --no-same-owner -C /usr/bin/ kubernetes/client/bin/kubectl
 
-# get terraform
-RUN TF_VER="1.4.5"; \
-    curl -sfL https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_linux_${TARGETARCH}.zip -o /tmp/terraform.zip && \
-    unzip /tmp/terraform.zip -d /usr/bin/ && \
-    ln -s /usr/bin/terraform /usr/bin/tf; \
-    \
-    rm -f /tmp/terraform.zip
-ENV TF_LOG=INFO
+# get terraform plugins
+COPY --from=fetch /workspace/.terraform.d/plugins /usr/share/terraform/providers/plugins
 
-# run as non-root
-RUN adduser -D -h /var/terraform -u 1000 terraform
-USER terraform
-WORKDIR /var/terraform/workspace
-
-# Prepare .terraformrc
-COPY terraformrc /var/terraform/.terraformrc
-RUN mkdir -p /var/terraform/.terraform.d/plugins
-
-# prepare provider plugin mirror for built-in templates
-COPY mirror-plugins.sh .
-RUN ./mirror-plugins.sh
-
-CMD [ "terraform" ]
+ENV TF_LOG=INFO \
+    TF_IN_AUTOMATION=1 \
+    TF_PLUGIN_MIRROR_DIR="/usr/share/terraform/providers/plugins"
+COPY terraform /usr/local/bin/terraform
+ENTRYPOINT ["terraform"]

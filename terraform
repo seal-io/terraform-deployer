@@ -1,0 +1,68 @@
+#!/usr/bin/env sh
+
+set -o errexit
+
+network_mirror() {
+  cat <<EOF
+provider_installation {
+  network_mirror {
+    url = "${TF_CLI_NETWORK_MIRROR_URL}"
+  }
+}
+EOF
+
+  if [ "${TF_CLI_NETWORK_MIRROR_INSECURE_SKIP_VERIFY}" = "true" ]; then
+    host=$(echo "${TF_CLI_NETWORK_MIRROR_URL}" | awk -F[/:] '{print $4}')
+    server=$(echo "${host}" | sed -e 's/:[0-9]*$//')
+
+    if [ "${host}" = "${server}" ]; then
+      host="${host}:443"
+    fi
+
+    # from https://go.dev/src/crypto/x509/root_linux.go.
+    echo quit | openssl s_client -showcerts -servername "${server}" -connect "${host}" 2>/dev/null | openssl x509 -outform PEM >/etc/ssl/certs/ca-cert-"${server}".pem
+  fi
+}
+
+filesystem_mirror() {
+  if [ -d "${TF_PLUGIN_MIRROR_DIR}" ]; then
+    excludes=$(find "${TF_PLUGIN_MIRROR_DIR}" -type d -maxdepth 3 -mindepth 3 -exec sh -c 'echo "$1" | sed -e s#$TF_PLUGIN_MIRROR_DIR/##' _ {} \;)
+  fi
+
+  if [ -n "${excludes}" ]; then
+    # shellcheck disable=SC2016
+    excludes=$(echo "${excludes}" | sed -e 'H;${x;s/\n/,/g;s/^,//;s/,/",\n      "/g;p;};d')
+    excludes=$(printf "\"%s\"" "${excludes}")
+
+    cat <<EOF
+provider_installation {
+  filesystem_mirror {
+    path = "${TF_PLUGIN_MIRROR_DIR}"
+  }
+  direct {
+    exclude = [
+      ${excludes}
+    ]
+  }
+}
+EOF
+  fi
+}
+
+entry() {
+  if [ ! -f "${HOME}"/.terraformrc ]; then
+    if [ -n "${TF_CLI_NETWORK_MIRROR_URL}" ]; then
+      config=$(network_mirror)
+    else
+      config=$(filesystem_mirror)
+    fi
+
+    if [ -n "${config}" ]; then
+      echo "${config}" >"${HOME}"/.terraformrc
+    fi
+  fi
+
+  exec /bin/terraform "$@"
+}
+
+entry "$@"

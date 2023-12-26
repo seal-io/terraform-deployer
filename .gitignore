@@ -1,0 +1,17 @@
+*.dll
+*.exe
+.DS_Store
+*.tfplan
+*.tfstate
+*.backup
+.sbin/
+.dist/
+.terraform/
+*.db
+*.log
+*.bak
+*.sig
+*~
+.*.swp
+.idea
+.vscode/

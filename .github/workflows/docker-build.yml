@@ -53,3 +53,5 @@ jobs:
             type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer
           cache-to: |
             ${{ github.event_name != 'pull_request' && format('type=registry,mode=max,oci-mediatypes=false,compression=gzip,ref={0}/build-cache:terraform-deployer,ignore-error=true', env.REPO) || '' }}
+          no-cache-filters: |
+            fetch
