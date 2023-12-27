@@ -50,8 +50,8 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           platforms: ${{ env.BUILD_PLATFORMS }}
           cache-from: |
-            type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer
+            type=registry,ref=${{ env.REPO }}/build-cache:terraform-deployer${{ startsWith(github.ref, 'refs/tags/') && '-release' || '' }}
           cache-to: |
-            ${{ github.event_name != 'pull_request' && format('type=registry,mode=max,oci-mediatypes=false,compression=gzip,ref={0}/build-cache:terraform-deployer,ignore-error=true', env.REPO) || '' }}
+            ${{ github.event_name != 'pull_request' && format('type=registry,mode=max,oci-mediatypes=false,compression=gzip,ref={0}/build-cache:terraform-deployer{1},ignore-error=true', env.REPO, startsWith(github.ref, 'refs/tags/') && '-release' || '') || '' }}
           no-cache-filters: |
-            fetch
+            ${{ startsWith(github.ref, 'refs/tags/') && 'fetch' || '' }}
