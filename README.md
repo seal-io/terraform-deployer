@@ -1,8 +1,18 @@
 # Terraform Deployer
 
+[![](https://img.shields.io/github/actions/workflow/status/seal-io/terraform-deployer/docker-build.yml?label=build)](https://github.com/seal-io/terraform-deployer/actions)
+[![](https://img.shields.io/docker/image-size/sealio/terraform-deployer/main?label=docker)](https://hub.docker.com/r/sealio/terraform-deployer/tags)
+[![](https://img.shields.io/github/v/tag/seal-io/terraform-deployer?label=release)](https://github.com/seal-io/terraform-deployer/releases)
+
 This image is used for rapid deployment by [Walrus](https://github.com/seal-io/walrus), it's close to [hashicorp/terroform](https://hub.docker.com/r/hashicorp/terraform), but provides Terraform mirroring ability.
 
 This tool is maintained by [Seal](https://github.com/seal-io).
+
+To build specific Terraform version with the following script. 
+
+```shell
+$ docker build --build-arg TERRAFORM_VERSION=<VERSION> --tag sealio/terraform-deployer:dev -f Dockerfile . 
+```
 
 ## Implied Mirroring
 
@@ -13,7 +23,7 @@ Terraform will try all configs below `provider_installation` to select the newes
 To caching succeed, Terraform Deployer searches the Provider Mirror directory(`/usr/share/terraform/providers/plugins`) and construct a proper [Terraform Client Configuration](https://developer.hashicorp.com/terraform/cli/config/config-file) as below for Terraform running.
 
 ```hcl
-# find /usr/share/terraform/providers -d
+# find /usr/share/terraform/providers -type d -maxdepth 3 -mindepth 3
 provider_installation {
   filesystem_mirror {
     path    = "/usr/share/terraform/providers/plugins"
