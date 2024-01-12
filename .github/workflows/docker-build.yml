@@ -17,6 +17,13 @@ env:
 
 jobs:
   build-and-push:
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+
+    timeout-minutes: 60
+
     runs-on: ubuntu-22.04
 
     steps:
