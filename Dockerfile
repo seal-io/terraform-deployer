@@ -1,7 +1,9 @@
+ARG TERRAFORM_VERSION=1.5.7
+
 #
 # Fetch
 #
-FROM --platform=$TARGETPLATFORM hashicorp/terraform:1.5.7 AS fetch
+FROM --platform=$TARGETPLATFORM hashicorp/terraform:${TERRAFORM_VERSION} AS fetch
 
 ARG TARGETPLATFORM
 ARG TARGETOS
@@ -51,7 +53,7 @@ RUN set -eo pipefail; \
 #
 # Release
 #
-FROM --platform=$TARGETPLATFORM hashicorp/terraform:1.5.7
+FROM --platform=$TARGETPLATFORM hashicorp/terraform:${TERRAFORM_VERSION}
 LABEL maintainer="Seal Engineer Team <engineering@seal.io>"
 
 ARG TARGETPLATFORM
